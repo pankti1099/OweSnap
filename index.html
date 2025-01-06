@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Splitter</title>
+</head>
+<body>
+    <h1>Expense Splitter</h1>
+
+    <!-- Navigation Tabs -->
+    <div>
+        <button class="tab-button" data-tab="households">Households</button>
+        <button class="tab-button" data-tab="expenses">Add Expense</button>
+        <button class="tab-button" data-tab="balances">View Balances</button>
+    </div>
+
+    <!-- Households Section -->
+    <section id="households-section">
+        <h2>Manage Households</h2>
+        <ul id="household-list"></ul> <!-- Updated to dynamically populate -->
+        <form id="add-household-form">
+            <input type="text" id="household-name" placeholder="Household Name" required>
+            <input type="text" id="friends" placeholder="Friends (comma-separated)" required>
+            <button type="submit">Add Household</button>
+        </form>
+    </section>
+
+    <!-- Add Expense Section -->
+    <section id="expenses-section" style="display: none;">
+        <h2>Add Expense</h2>
+        <form id="add-expense-form">
+            <input type="text" id="expense-household" placeholder="Household Name" required>
+            <input type="text" id="payer" placeholder="Payer" required>
+            <input type="text" id="description" placeholder="Description" required>
+            <input type="number" id="amount" placeholder="Amount" step="0.01" required>
+            <input type="text" id="participants" placeholder="Participants (comma-separated)" required>
+            <button type="submit">Add Expense</button>
+        </form>
+    </section>
+
+    <!-- View Balances Section -->
+    <section id="balances-section" style="display: none;">
+        <h2>View Balances</h2>
+        <form id="view-balances-form">
+            <input type="text" id="balances-household" placeholder="Household Name" required>
+            <button type="submit">View Balances</button>
+        </form>
+
+        <!-- Balance Table -->
+        <h3>Balance Table</h3>
+        <table id="balance-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Net Balance</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+
+        <!-- Transactions Section -->
+        <h3>Transactions</h3>
+        <ul id="transactions-list"></ul>
+    </section>
+
+    <script>
+        // Utility Functions
+        function resetAllForms() {
+            document.querySelectorAll("form").forEach(form => form.reset());
+        }
+
+        function clearResults() {
+            document.querySelector("#balance-table tbody").innerHTML = "";
+            document.getElementById("transactions-list").innerHTML = "";
+            document.getElementById("household-list").innerHTML = ""; // Clear household list
+        }
+
+        // Fetch and Display Households
+        async function loadHouseholds() {
+            try {
+                const response = await fetch("/households");
+                const data = await response.json();
+
+                const householdList = document.getElementById("household-list");
+                householdList.innerHTML = ""; // Clear the list before populating
+
+                if (Object.keys(data).length === 0) {
+                    householdList.innerHTML = "<li>No households available. Add one below!</li>";
+                    return;
+                }
+
+                for (const household in data) {
+                    const members = Object.keys(data[household].friends).join(", ");
+                    const li = document.createElement("li");
+                    li.innerHTML = `<strong>${household}</strong>: ${members}`;
+                    householdList.appendChild(li);
+                }
+            } catch (error) {
+                console.error("Error loading households:", error);
+                alert("An error occurred while loading households.");
+            }
+        }
+
+        // Tab Switching Logic
+        document.querySelectorAll(".tab-button").forEach(button => {
+            button.addEventListener("click", () => {
+                resetAllForms();
+                clearResults();
+
+                const target = button.getAttribute("data-tab");
+                document.querySelectorAll("section").forEach(section => {
+                    section.style.display = "none";
+                });
+                document.getElementById(`${target}-section`).style.display = "block";
+
+                // Load households when switching to the Households tab
+                if (target === "households") {
+                    loadHouseholds();
+                }
+            });
+        });
+
+        // Add Household
+        document.getElementById("add-household-form").addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const householdName = document.getElementById("household-name").value.trim();
+            const friends = document.getElementById("friends").value.split(",").map(f => f.trim());
+
+            if (!householdName || friends.length === 0) {
+                alert("Household name and friends are required!");
+                return;
+            }
+
+            try {
+                const response = await fetch("/households", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ household_name: householdName, friends }),
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    alert(result.message);
+                    document.getElementById("add-household-form").reset();
+                    loadHouseholds(); // Reload households to show the updated list
+                } else {
+                    alert(result.error);
+                }
+            } catch (error) {
+                console.error("Error adding household:", error);
+                alert("An error occurred while adding the household.");
+            }
+        });
+
+        // Add Expense
+        document.getElementById("add-expense-form").addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const householdName = document.getElementById("expense-household").value.trim();
+            const payer = document.getElementById("payer").value.trim();
+            const description = document.getElementById("description").value.trim();
+            const amount = parseFloat(document.getElementById("amount").value.trim());
+            const participants = document.getElementById("participants").value.split(",").map(p => p.trim());
+
+            if (!householdName || !payer || !description || !amount || participants.length === 0) {
+                alert("All fields are required!");
+                return;
+            }
+
+            try {
+                const response = await fetch("/expenses", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ household_name: householdName, payer, description, amount, participants }),
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    alert(result.message);
+                    document.getElementById("add-expense-form").reset();
+                } else {
+                    alert(result.error);
+                    document.getElementById("add-expense-form").reset();
+                }
+            } catch (error) {
+                console.error("Error adding expense:", error);
+                alert("An error occurred while adding the expense.");
+                document.getElementById("add-expense-form").reset();
+            }
+        });
+
+        document.getElementById("view-balances-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const householdName = document.getElementById("balances-household").value.trim();
+
+    try {
+        const response = await fetch(`/balances/${encodeURIComponent(householdName)}`);
+        const data = await response.json();
+
+        const balanceTableBody = document.querySelector("#balance-table tbody");
+        const transactionsList = document.getElementById("transactions-list");
+
+        balanceTableBody.innerHTML = "";
+        transactionsList.innerHTML = "";
+
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+
+        // Populate Balance Table
+        data.balance_table.forEach((entry) => {
+            const row = document.createElement("tr");
+            row.innerHTML = `<td>${entry.name}</td><td>${entry.balance < 0 ? `owes ${Math.abs(entry.balance)}` : `is owed ${entry.balance}`}</td>`;
+            balanceTableBody.appendChild(row);
+        });
+
+        // Populate Transactions (Add This Code)
+        if (data.recent_expenses.length > 0) {
+            transactionsList.innerHTML = "<h4>Recent Expenses</h4>";
+            data.recent_expenses.forEach((expense, index) => {
+                const li = document.createElement("li");
+                li.innerHTML = `
+                    <strong>${expense.description}</strong> - Paid by ${expense.payer} - $${expense.amount.toFixed(2)} - Split between ${expense.participants.join(", ")}
+                    <button class="delete-button" data-index="${index}" data-household="${householdName}">Delete</button>
+                `;
+                transactionsList.appendChild(li);
+            });
+
+            // Add event listeners for delete buttons
+            document.querySelectorAll(".delete-button").forEach(button => {
+                button.addEventListener("click", async (event) => {
+                    const expenseIndex = button.getAttribute("data-index");
+                    const householdName = button.getAttribute("data-household");
+                    await deleteExpense(householdName, expenseIndex);
+                });
+            });
+        } else {
+            transactionsList.innerHTML = "<li>No recent expenses to show.</li>";
+        }
+    } catch (error) {
+        console.error("Error viewing balances:", error);
+        alert("An error occurred while viewing balances.");
+    }
+});
+
+
+async function deleteExpense(householdName, expenseIndex) {
+    try {
+        const response = await fetch(`/expenses/${encodeURIComponent(householdName)}/${expenseIndex}`, {
+            method: "DELETE",
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            alert(result.message);
+            document.getElementById("view-balances-form").dispatchEvent(new Event("submit")); // Refresh balances
+        } else {
+            alert(result.error);
+        }
+    } catch (error) {
+        console.error("Error deleting expense:", error);
+        alert("An error occurred while deleting the expense.");
+    }
+}
+
+    </script>
+</body>
+</html>

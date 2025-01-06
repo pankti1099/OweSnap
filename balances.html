@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Balances</title>
+</head>
+<body>
+    <h1>Balances for {{ household_name }}</h1>
+    <ul>
+        {% for friend, balance in balances.items() %}
+            <li>
+                {{ friend }}: 
+                {% if balance < 0 %}
+                    owes {{ abs(balance) }}
+                {% else %}
+                    is owed {{ balance }}
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+    <a href="/">Back to Home</a>
+</body>
+</html>
